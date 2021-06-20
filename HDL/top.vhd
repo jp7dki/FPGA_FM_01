@@ -18,20 +18,27 @@ entity top is
 		adc_data : in std_logic_vector(9 downto 0);
 		pwr_out : out std_logic;
 		enc_out : out std_logic;
-		dac_out : out std_logic
+		dac_out : out std_logic;
+		swa_in : in std_logic;
+		swb_in : in std_logic;
+		swc_in : in std_logic;
+		swd_in : in std_logic
 	);
 end top;
 
 architecture rtl of top is
 
 	constant ONE : std_logic_vector(35 downto 0) := (others => '1');
-	constant PHASE_PI : std_logic_vector(35 downto 0) := X"3FFFFFFFF";
-	constant PHASE_MPI : std_logic_vector(35 downto 0) := X"C00000001";
+	constant PHASE_PI : std_logic_vector(35 downto 0) := X"400000000";
+	constant PHASE_MPI : std_logic_vector(35 downto 0) := X"C00000000";
 
 	---------------------------------------
 	-- internal signal
 	---------------------------------------
 	signal clk664 : std_logic;
+	
+	signal swa_reg : std_logic;
+	signal swb_reg : std_logic;
 	
 	-- reset
 	signal res_n : std_logic := '0';
@@ -41,8 +48,14 @@ architecture rtl of top is
 	
 --	signal tune_freq : std_logic_vector(15 downto 0) := X"3E13";		-- 82.5MHz:NHK-FM (nagoya)
 --	signal tune_freq : std_logic_vector(15 downto 0) := X"26F1";		-- 76.5MHz:FM ichinomiya
-	signal tune_freq : std_logic_vector(15 downto 0) := X"52E4";		-- 87.9MHz:FM transmittor
+--	signal tune_freq : std_logic_vector(15 downto 0) := X"52E4";		-- 87.9MHz:FM transmittor
+--	signal tune_freq : std_logic_vector(15 downto 0) := X"662B";		-- 92.9MHz:Tokai Radio
+--	signal tune_freq : std_logic_vector(15 downto 0) := X"3722";		-- 80.7MHz:FM Aichi
 --	signal tune_freq : std_logic_vector(15 downto 0) := X"0001";		-- test
+	signal tune_freq : std_logic_vector(15 downto 0);
+
+	signal freq_count : std_logic_vector(15 downto 0);			-- for debug
+
 	signal sin_out : std_logic_vector(17 downto 0);
 	signal cos_out : std_logic_vector(17 downto 0);
 	
@@ -61,13 +74,15 @@ architecture rtl of top is
 	signal lpf_q_out : std_logic_vector(35 downto 0);
 	signal lpf_i_out : std_logic_vector(35 downto 0);
 	
+	signal conv_start : std_logic;
 	signal abs_result : std_logic_vector(35 downto 0);
 	signal phase_result : std_logic_vector(35 downto 0);
+	signal diff_phase : std_logic_vector(35 downto 0);
 	signal done : std_logic;
+	signal done_reg : std_logic;
 	
 	signal phase_result_reg : std_logic_vector(35 downto 0);
 	signal fm_result : std_logic_vector(35 downto 0);
-	signal debug : std_logic_vector(1 downto 0);
 	
 	---------------------------------------
 	-- PLL 
@@ -97,6 +112,7 @@ architecture rtl of top is
 	---------------------------------------
 	-- NCO
 	---------------------------------------
+	
 	component nco
 	generic(
 		BIT_WIDTH_PHASE : integer;
@@ -227,6 +243,31 @@ begin
 	---------------------------------------
 	-- NCO
 	---------------------------------------
+	
+	-- freq control
+	process(done, res_n) begin
+		if(res_n  = '0') then
+			tune_freq <= X"52E3";
+			swa_reg <= '1';
+			swb_reg <= '1';
+		
+		elsif(done'event and done = '1') then
+			if((swa_in='0') and (swa_reg='1')) then
+				tune_freq <= tune_freq + X"0001";
+			end if;
+			
+			if((swb_in='0') and (swb_reg='1')) then
+				tune_freq <= tune_freq + X"FFFF";
+			end if;
+			
+			swa_reg <= swa_in;
+			swb_reg <= swb_in;
+			
+		end if;
+	end process;
+	
+	
+	
 	nco0 : nco
 	generic map(
 		BIT_WIDTH_PHASE => 16,
@@ -241,8 +282,9 @@ begin
 		cos_out => cos_out
 	);
 	
-	-- adc_result_internal <= adc_result(9) & adc_result(9) & adc_result(9) & adc_result(9) & adc_result(9) & adc_result(9) & adc_result(9) & adc_result(9) & adc_result;
-	adc_result_internal <= adc_result(8 downto 0) & "000000000";
+	 adc_result_internal <= adc_result & adc_result(0) & adc_result(0) & adc_result(0) & adc_result(0) & adc_result(0) & adc_result(0) & adc_result(0) & adc_result(0);
+   --	adc_result_internal <= adc_result(9) & adc_result(9) & adc_result(9) & adc_result(9) & adc_result(9) & adc_result(9) & adc_result(9) & adc_result(9) & adc_result;
+	-- adc_result_internal <= adc_result(8 downto 0) & "000000000";
 	
 	---------------------------------------
 	-- Mixer
@@ -328,13 +370,16 @@ begin
 	---------------------------------------
 	-- CORDIC
 	---------------------------------------
+	
+	conv_start <= lpf_clk_q and lpf_clk_i;
+	
 	cordic0 : cordic
 	port map(
 		clk => clk664,
 		res_n => res_n,
 		q_in => lpf_q_out,
 		i_in => lpf_i_out,
-		conv_start => lpf_clk_q,
+		conv_start => conv_start,
 		abs_out => abs_result,
 		phase_out => phase_result,
 		done => done
@@ -343,24 +388,61 @@ begin
 	---------------------------------------
 	-- FM demodulator
 	---------------------------------------
-	process(done, res_n) begin
+	
+	diff_phase <= phase_result + (phase_result_reg xor ONE) + 1;
+	
+	process(clk664, res_n) begin
 		if(res_n = '0') then
 			phase_result_reg <= (others => '0');
 			fm_result <= (others => '0');
-			debug <= (others => '0');
-		elsif(done'event and done = '1') then
-			if ((((phase_result + (phase_result_reg xor ONE) + 1) + PHASE_MPI) and X"800000000") = X"000000000") then
-				fm_result <= phase_result + (phase_result_reg xor ONE) + 1 + PHASE_MPI + PHASe_MPI;
-				debug <= "01";
-			elsif((((phase_result + (phase_result_reg xor ONE) + 1) + PHASE_PI) and X"800000000") /= X"000000000") then
-				fm_result <= phase_result + (phase_result_reg xor ONE) + 1 + PHASE_PI + PHASE_PI;
-				debug <= "10";
-			else
-				fm_result <= phase_result + (phase_result_reg xor ONE) + 1;
-				debug <= "00";
+			done_reg <= '0';
+			
+		elsif(clk664'event and clk664 = '1') then
+		
+			if((done='1') and (done_reg='0')) then
+				phase_result_reg <= phase_result;
+				
+				if ((((phase_result + (phase_result_reg xor ONE) + 1) + PHASE_MPI) and X"800000000") = X"000000000") then
+					fm_result <= phase_result + (phase_result_reg xor ONE) + 1 + PHASE_MPI + PHASe_MPI;
+				elsif((((phase_result + (phase_result_reg xor ONE) + 1) + PHASE_PI) and X"800000000") /= X"000000000") then
+					fm_result <= phase_result + (phase_result_reg xor ONE) + 1 + PHASE_PI + PHASE_PI;
+				else
+					fm_result <= phase_result + (phase_result_reg xor ONE) + 1;
+				end if;
+				
+--				if (diff_phase(35) = '0') then
+--				-- diff_phase > 0
+--				
+--					if (diff_phase(34) = '1') then
+--						-- diff_phase > 180
+--						fm_result <= ((diff_phase + X"C00000000") xor ONE) + 1;
+--						
+--					else
+--						-- diff_phase < 180
+--						fm_result <= diff_phase;
+--						
+--					end if;
+--					
+--				else
+--				-- diff_phase < 0
+--				
+--					if (diff_phase(34) = '0') then
+--						-- diff_phase < -180
+--						fm_result <= ((diff_phase + X"400000000") xor ONE) + 1;
+--						
+--					else
+--						-- diff_phase > -180
+--						fm_result <= diff_phase;
+--						
+--					end if;
+--				end if;
+				
 			end if;
-			phase_result_reg <= phase_result;
+			
+			done_reg <= done;
+			
 		end if;
+			
 	end process;
 	
 	---------------------------------------

@@ -21,13 +21,13 @@ architecture rtl of dsm_dac is
 
 	constant zero : std_logic_vector(BIT_WIDTH-1 downto 0) := (others => '0');
 	signal in_data_offset : std_logic_vector(BIT_WIDTH-1 downto 0);
-	signal add_signal : std_logic_vector(BIT_WIDTH+1 downto 0);
+	signal add_signal : std_logic_vector(BIT_WIDTH downto 0);
 	signal dsm_reg : std_logic_vector(BIT_WIDTH downto 0);
 	signal out_reg : std_logic;
 
 begin
-	in_data_offset <= in_data + X"3FFFFFFFF";
-	add_signal <= (dsm_reg(BIT_WIDTH) & dsm_reg(BIT_WIDTH downto 0)) + (in_data_offset(26 downto 0) & "0000000000");
+	in_data_offset <= in_data + X"7FFFFFFFF";
+	add_signal <= (dsm_reg(BIT_WIDTH-1 downto 0)) + ("0" & in_data_offset(BIT_WIDTH-1  downto 0));
 	out_data <= out_reg;
 
 	process (clk, res_n) begin
@@ -36,7 +36,7 @@ begin
 			out_reg <= '0';
 		elsif(clk'event and clk='1') then
 			dsm_reg <= add_signal(BIT_WIDTH downto 0);
-			out_reg <= add_signal(BIT_WIDTH+1);
+			out_reg <= add_signal(BIT_WIDTH);
 		end if;
 	end process;
 

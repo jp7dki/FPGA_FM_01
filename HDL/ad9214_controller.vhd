@@ -25,7 +25,7 @@ begin
 	process(clk, res_n) begin
 		if(res_n = '0') then
 			data_reg <= (others => '0');
-		elsif(clk'event and clk='0') then
+		elsif(clk'event and clk='1') then
 			-- adc data capture at clock falling edge --
 			data_reg <= adc_bus;
 		end if;
