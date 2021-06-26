@@ -83,6 +83,7 @@ architecture rtl of top is
 	
 	signal phase_result_reg : std_logic_vector(35 downto 0);
 	signal fm_result : std_logic_vector(35 downto 0);
+	signal fm_result_internal : std_logic_vector(35 downto 0);
 	
 	---------------------------------------
 	-- PLL 
@@ -282,9 +283,9 @@ begin
 		cos_out => cos_out
 	);
 	
-	 adc_result_internal <= adc_result & adc_result(0) & adc_result(0) & adc_result(0) & adc_result(0) & adc_result(0) & adc_result(0) & adc_result(0) & adc_result(0);
+	-- adc_result_internal <= adc_result & adc_result(0) & adc_result(0) & adc_result(0) & adc_result(0) & adc_result(0) & adc_result(0) & adc_result(0) & adc_result(0);
    --	adc_result_internal <= adc_result(9) & adc_result(9) & adc_result(9) & adc_result(9) & adc_result(9) & adc_result(9) & adc_result(9) & adc_result(9) & adc_result;
-	-- adc_result_internal <= adc_result(8 downto 0) & "000000000";
+	adc_result_internal <= adc_result(8 downto 0) & "000000000";
 	
 	---------------------------------------
 	-- Mixer
