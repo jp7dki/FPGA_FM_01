@@ -165,7 +165,7 @@ architecture rtl of top is
 	---------------------------------------
 	component lpf_01
 	port (
-		clk, res_n : in std_logic;
+		clk, conv_start, res_n : in std_logic;
 		clk_out : out std_logic;
 		in_data : in std_logic_vector(35 downto 0);
 		out_data : out std_logic_vector(35 downto 0)
@@ -282,8 +282,6 @@ begin
 		cos_out => cos_out
 	);
 	
-	-- adc_result_internal <= adc_result & adc_result(0) & adc_result(0) & adc_result(0) & adc_result(0) & adc_result(0) & adc_result(0) & adc_result(0) & adc_result(0);
-   --	adc_result_internal <= adc_result(9) & adc_result(9) & adc_result(9) & adc_result(9) & adc_result(9) & adc_result(9) & adc_result(9) & adc_result(9) & adc_result;
 	adc_result_internal <= adc_result(8 downto 0) & "000000000";
 	
 	---------------------------------------
@@ -351,7 +349,8 @@ begin
 	---------------------------------------
 	lpf_q : lpf_01
 	port map(
-		clk => cic_clk_q,
+		clk => clk664,
+		conv_start => cic_clk_q,
 		res_n => res_n,
 		clk_out => lpf_clk_q,
 		in_data => cic_q_out,
@@ -360,7 +359,8 @@ begin
 	
 	lpf_i : lpf_01
 	port map(
-		clk => cic_clk_i,
+		clk => clk664,
+		conv_start => cic_clk_i,
 		res_n => res_n,
 		clk_out => lpf_clk_i,
 		in_data => cic_i_out,
@@ -418,32 +418,6 @@ begin
 						fm_result <= phase_result + (phase_result_reg xor ONE) + 1;
 					end if;
 				end if;
---				if (diff_phase(35) = '0') then
---				-- diff_phase > 0
---				
---					if (diff_phase(34) = '1') then
---						-- diff_phase > 180
---						fm_result <= ((diff_phase + X"C00000000") xor ONE) + 1;
---						
---					else
---						-- diff_phase < 180
---						fm_result <= diff_phase;
---						
---					end if;
---					
---				else
---				-- diff_phase < 0
---				
---					if (diff_phase(34) = '0') then
---						-- diff_phase < -180
---						fm_result <= ((diff_phase + X"400000000") xor ONE) + 1;
---						
---					else
---						-- diff_phase > -180
---						fm_result <= diff_phase;
---						
---					end if;
---				end if;
 				
 			end if;
 			

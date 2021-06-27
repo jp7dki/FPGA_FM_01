@@ -7,7 +7,7 @@ use IEEE.std_logic_arith.all;
 
 entity lpf_01 is
 	port (
-		clk, res_n : in std_logic;
+		clk, conv_start, res_n : in std_logic;
 		clk_out : out std_logic;
 		in_data : in std_logic_vector(35 downto 0);
 		out_data : out std_logic_vector(35 downto 0)
@@ -25,6 +25,7 @@ architecture rtl of lpf_01 is
 	signal in_data_reg : std_logic_vector(35 downto 0);
 	signal bufs : buf;
 	signal out_data_internal : std_logic_vector(35 downto 0);
+	signal conv_start_reg : std_logic;
 	
 	component lpf_01_coefficient
 	port(
@@ -41,14 +42,19 @@ begin
 			data_count <= (others => '0');
 			data_count_reg <= (others => '0');
 			in_data_reg <= (others => '0');
+			conv_start_reg <= '0';
 			for i in 0 to 31 loop
 				bufs(i) <= (others => '0');
 			end loop;
+			
 		elsif(clk'event and clk='1') then
-			data_count <= data_count + "00001";
-			data_count_reg <= data_count;
-			in_data_reg <= in_data;
-			bufs(conv_integer(data_count_reg)) <= signed(coef(31 downto 14)) * signed(in_data_reg(35 downto 18));
+			if((conv_start = '1') and (conv_start_reg = '0')) then
+				data_count <= data_count + "00001";
+				data_count_reg <= data_count;
+				in_data_reg <= in_data;
+				bufs(conv_integer(data_count_reg)) <= signed(coef(31 downto 14)) * signed(in_data_reg(35 downto 18));
+			end if;
+			conv_start_reg <= conv_start;
 		end if;	
 	end process;
 	
