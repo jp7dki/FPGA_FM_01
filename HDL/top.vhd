@@ -83,7 +83,6 @@ architecture rtl of top is
 	
 	signal phase_result_reg : std_logic_vector(35 downto 0);
 	signal fm_result : std_logic_vector(35 downto 0);
-	signal fm_result_internal : std_logic_vector(35 downto 0);
 	
 	---------------------------------------
 	-- PLL 
@@ -248,7 +247,7 @@ begin
 	-- freq control
 	process(done, res_n) begin
 		if(res_n  = '0') then
-			tune_freq <= X"52E3";
+			tune_freq <= X"52E4";
 			swa_reg <= '1';
 			swb_reg <= '1';
 		
@@ -401,16 +400,24 @@ begin
 		elsif(clk664'event and clk664 = '1') then
 		
 			if((done='1') and (done_reg='0')) then
+			
 				phase_result_reg <= phase_result;
 				
-				if ((((phase_result + (phase_result_reg xor ONE) + 1) + PHASE_MPI) and X"800000000") = X"000000000") then
-					fm_result <= phase_result + (phase_result_reg xor ONE) + 1 + PHASE_MPI + PHASe_MPI;
-				elsif((((phase_result + (phase_result_reg xor ONE) + 1) + PHASE_PI) and X"800000000") /= X"000000000") then
-					fm_result <= phase_result + (phase_result_reg xor ONE) + 1 + PHASE_PI + PHASE_PI;
-				else
-					fm_result <= phase_result + (phase_result_reg xor ONE) + 1;
-				end if;
+				-- diff_phase > 0 and diff_phase > 180
+				if(diff_phase(35) = '0') then
+					if ((((phase_result + (phase_result_reg xor ONE) + 1) + PHASE_MPI) and X"800000000") = X"000000000") then
+						fm_result <= phase_result + (phase_result_reg xor ONE) + 1 + PHASE_MPI + PHASE_MPI;
+					else
+						fm_result <= phase_result + (phase_result_reg xor ONE) + 1;
+					end if;
 				
+				else
+					if((((phase_result + (phase_result_reg xor ONE) + 1) + PHASE_PI) and X"800000000") /= X"000000000") then
+						fm_result <= phase_result + (phase_result_reg xor ONE) + 1 + PHASE_PI + PHASE_PI;							
+					else
+						fm_result <= phase_result + (phase_result_reg xor ONE) + 1;
+					end if;
+				end if;
 --				if (diff_phase(35) = '0') then
 --				-- diff_phase > 0
 --				
