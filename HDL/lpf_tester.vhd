@@ -18,7 +18,8 @@ entity lpf_tester is
 	port (
 		clk48 : in std_logic;
 		tune_freq : in std_logic_vector(15 downto 0);
-		filt_out : out std_logic_vector(35 downto 0)
+		filt_out : out std_logic_vector(35 downto 0);
+		filt_out_a : out std_logic_vector(35 downto 0)
 	);
 end lpf_tester;
 
@@ -49,16 +50,7 @@ architecture rtl of lpf_tester is
 	signal lpf_clk_q : std_logic;
 	signal lpf_q_out : std_logic_vector(35 downto 0);
 	
-	---------------------------------------
-	-- PLL 
-	---------------------------------------
-	component pll
-	PORT
-	(
-		inclk0		: IN STD_LOGIC  := '0';
-		c0		: OUT STD_LOGIC 
-	);
-	end component;
+	signal lpf_clk_q_a : std_logic;
 	
 	---------------------------------------
 	-- NCO
@@ -98,7 +90,16 @@ architecture rtl of lpf_tester is
 	---------------------------------------
 	-- FIR Filter (Poly-Phase Filter)
 	---------------------------------------
-	component lpf_02
+	component lpf_01
+	port (
+		clk, conv_start, res_n : in std_logic;
+		clk_out : out std_logic;
+		in_data : in std_logic_vector(35 downto 0);
+		out_data : out std_logic_vector(35 downto 0)
+	);
+	end component;
+	
+	component lpf_01_a
 	port (
 		clk, conv_start, res_n : in std_logic;
 		clk_out : out std_logic;
@@ -123,14 +124,7 @@ begin
 		end if;
 	end process;
 	
-	---------------------------------------
-	-- PLL 
-	---------------------------------------
-	pll0 : pll
-	port map(
-		inclk0 => clk48,
-		c0 => clk664
-	);
+	clk664 <= clk48;
 	
 	---------------------------------------
 	-- NCO
@@ -149,10 +143,7 @@ begin
 		cos_out => cos_out
 	);
 	
-	mixer_q_out <= sin_out & 
-						sin_out(0) & sin_out(0) & sin_out(0) & sin_out(0) & sin_out(0) & sin_out(0) & 
-						sin_out(0) & sin_out(0) & sin_out(0) & sin_out(0) & sin_out(0) & sin_out(0) & 
-						sin_out(0) & sin_out(0) & sin_out(0) & sin_out(0) & sin_out(0) & sin_out(0);
+	mixer_q_out <= sin_out & "000000000000000000";
 	--mixer_q_out <= sin_out(17) & sin_out(17) & sin_out(17) & sin_out(17) & sin_out(17) & sin_out(17) & 
 	--					sin_out(17) & sin_out(17) & sin_out(17) & sin_out(17) & sin_out(17) & sin_out(17) & 
 	--					sin_out(17) & sin_out(17) & sin_out(17) & sin_out(17) & sin_out(17) & sin_out(17) &
@@ -180,7 +171,7 @@ begin
 	---------------------------------------
 	-- FIR Filter (Poly-Phase Filter)
 	---------------------------------------
-	lpf_q : lpf_02
+	lpf_q : lpf_01
 	port map(
 		clk => clk664,
 		conv_start => cic_clk_q,
@@ -188,6 +179,16 @@ begin
 		clk_out => lpf_clk_q,
 		in_data => cic_q_out,
 		out_data => filt_out
+	);
+	
+	lpf_q_a : lpf_01_a
+	port map(
+		clk => clk664,
+		conv_start => cic_clk_q,
+		res_n => res_n,
+		clk_out => lpf_clk_q_a,
+		in_data => cic_q_out,
+		out_data => filt_out_a
 	);
 	
 end rtl;

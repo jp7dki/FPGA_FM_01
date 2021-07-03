@@ -84,6 +84,8 @@ architecture rtl of top is
 	signal phase_result_reg : std_logic_vector(35 downto 0);
 	signal fm_result : std_logic_vector(35 downto 0);
 	
+	signal lpf_out : std_logic_vector(35 downto 0);
+	
 	---------------------------------------
 	-- PLL 
 	---------------------------------------
@@ -186,6 +188,18 @@ architecture rtl of top is
 	);
 	end component;
 	
+	
+	---------------------------------------
+	-- LPF for audio signal
+	---------------------------------------
+	component lpf_aud_01 is
+	port (
+		clk, conv_start, res_n : in std_logic;
+		in_data : in std_logic_vector(35 downto 0);
+		out_data : out std_logic_vector(35 downto 0)
+	);
+	end component;
+	
 	---------------------------------------
 	-- DAC
 	---------------------------------------
@@ -282,7 +296,7 @@ begin
 		cos_out => cos_out
 	);
 	
-	adc_result_internal <= adc_result(8 downto 0) & "000000000";
+	adc_result_internal <= adc_result(9 downto 0) & "00000000";
 	
 	---------------------------------------
 	-- Mixer
@@ -316,8 +330,8 @@ begin
 	generic map(
 		INPUT_WIDTH => 36,
 		OUTPUT_WIDTH => 36,
-		REG_WIDTH => 45,
-		TAP_NUM => 4,
+		REG_WIDTH => 40,
+		TAP_NUM => 2,
 		DECIM_RATE => 2
 	)
 	port map(
@@ -332,8 +346,8 @@ begin
 	generic map(
 		INPUT_WIDTH => 36,
 		OUTPUT_WIDTH => 36,
-		REG_WIDTH => 45,
-		TAP_NUM => 4,
+		REG_WIDTH => 40,
+		TAP_NUM => 2,
 		DECIM_RATE => 2
 	)
 	port map(
@@ -405,14 +419,14 @@ begin
 				
 				-- diff_phase > 0 and diff_phase > 180
 				if(diff_phase(35) = '0') then
-					if ((((phase_result + (phase_result_reg xor ONE) + 1) + PHASE_MPI) and X"800000000") = X"000000000") then
+					if (((diff_phase + PHASE_MPI) and X"800000000") = X"000000000") then
 						fm_result <= phase_result + (phase_result_reg xor ONE) + 1 + PHASE_MPI + PHASE_MPI;
 					else
 						fm_result <= phase_result + (phase_result_reg xor ONE) + 1;
 					end if;
 				
 				else
-					if((((phase_result + (phase_result_reg xor ONE) + 1) + PHASE_PI) and X"800000000") /= X"000000000") then
+					if(((diff_phase + PHASE_PI) and X"800000000") /= X"000000000") then
 						fm_result <= phase_result + (phase_result_reg xor ONE) + 1 + PHASE_PI + PHASE_PI;							
 					else
 						fm_result <= phase_result + (phase_result_reg xor ONE) + 1;
@@ -428,6 +442,18 @@ begin
 	end process;
 	
 	---------------------------------------
+	-- LFP for audio signal
+	---------------------------------------
+	lpf3 : lpf_aud_01
+	port map(
+		clk => clk664,
+		conv_start => done,
+		res_n => res_n,
+		in_data => fm_result,
+		out_data => lpf_out
+	);
+	
+	---------------------------------------
 	-- DAC +
 	---------------------------------------
 	dac0 : dsm_dac
@@ -437,7 +463,7 @@ begin
 	port map(
 		clk => clk664,
 		res_n => res_n,
-		in_data => fm_result,
+		in_data => lpf_out,
 		out_data => dac_out
 	);
 	
